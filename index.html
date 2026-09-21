@@ -102,6 +102,9 @@
                         </div>
                     </div>
                     <div class="flex items-center space-x-3">
+                        <button onclick="syncDataFromCloud()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
+                            <i class="fa-solid fa-sync"></i> Sinkron Sheet
+                        </button>
                         <a href="https://docs.google.com/spreadsheets/d/1D11o2daOOBDVzF3ZyHjs-K8QkozVj11QfK8zP8Pdeyc/edit?gid=1495108852#gid=1495108852" target="_blank" class="hidden sm:flex bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition items-center gap-1">
                             <i class="fa-solid fa-file-excel"></i> Database Sheet
                         </a>
@@ -816,6 +819,9 @@
         let currentRole = 'admin'; // 'admin' or 'user'
         let loggedUserPelangganId = null;
 
+        // URL Web App Google Apps Script dari Spreadsheet Anda (Ganti dengan URL deployment Anda)
+        const SPREADSHEET_API_URL = 'URL_WEB_APP_ANDA_DISINI';
+
         // Default Master Tarif
         const masterTarif = {
             'S': { nama: 'Sosial', hargaPerM3: 1000, biayaAdmin: 3000, ket: 'Fasilitas umum / Tempat ibadah' },
@@ -824,51 +830,46 @@
             'K': { nama: 'Komersial', hargaPerM3: 2000, biayaAdmin: 12000, ket: 'Usaha / Bisnis' }
         };
 
-        // Data Pelanggan with password feature (default: 123456)
+        // Fallback Local Storage Data
         let dataPelanggan = JSON.parse(localStorage.getItem('pam_pelanggan')) || [
             { id: 'P-0001', nama: 'Siti Purwa', blok: 'B 01', wa: '6287794735477', pass: '123456', status: 'Aktif', kategori: 'R1' },
-            { id: 'P-0002', nama: 'Sugino', blok: 'B 02', wa: '6288802640166', pass: '123456', status: 'Aktif', kategori: 'R1' },
-            { id: 'P-0003', nama: 'Yoga (B 03)', blok: 'B 03', wa: '6288216429729', pass: '123456', status: 'Aktif', kategori: 'R1' },
-            { id: 'P-0004', nama: 'Siti Kurnia', blok: 'B 04', wa: '6285794829893', pass: '123456', status: 'Aktif', kategori: 'R1' },
-            { id: 'P-0005', nama: 'Surati B 05', blok: 'B 05', wa: '6282115922499', pass: '123456', status: 'Aktif', kategori: 'R1' },
-            { id: 'P-0006', nama: 'dr. Rini', blok: 'B 06', wa: '628122764377', pass: '123456', status: 'Aktif', kategori: 'R1' },
-            { id: 'P-0007', nama: 'Arifin', blok: 'B 07', wa: '6282323578711', pass: '123456', status: 'Aktif', kategori: 'R1' },
-            { id: 'P-0008', nama: 'Deny Nurharjanto', blok: 'B 08', wa: '6285211163991', pass: '123456', status: 'Aktif', kategori: 'R1' },
-            { id: 'P-0013', nama: 'B 13', blok: 'B 13', wa: '0', pass: '123456', status: 'Aktif', kategori: 'R1' },
-            { id: 'P-0014', nama: 'Rudhi Wibisono', blok: 'C 01', wa: '6281391470908', pass: '123456', status: 'Aktif', kategori: 'R1' }
+            { id: 'P-0002', nama: 'Sugino', blok: 'B 02', wa: '6288802640166', pass: '123456', status: 'Aktif', kategori: 'R1' }
         ];
 
-        // Data Catat Meter Air
-        let dataCatatMeter = JSON.parse(localStorage.getItem('pam_meter')) || [
-            { id: 'C-a0001', idPelanggan: 'P-0001', tgl: '2026-02-01', lalu: 40, sekarang: 45, pemakaian: 5, tagihanMurni: 11000, sisaLalu: 0, totalHarusBayar: 11000, bayar: 11000, sisa: 0, status: 'Lunas' },
-            { id: 'C-a0002', idPelanggan: 'P-0002', tgl: '2026-02-01', lalu: 253, sekarang: 261, pemakaian: 8, tagihanMurni: 14600, sisaLalu: 0, totalHarusBayar: 14600, bayar: 10000, sisa: 4600, status: 'Kurang Bayar' },
-            { id: 'C-a0011', idPelanggan: 'P-0013', tgl: '2026-02-01', lalu: 9, sekarang: 9, pemakaian: 0, tagihanMurni: 5000, sisaLalu: 0, totalHarusBayar: 5000, bayar: 0, sisa: 5000, status: 'Belum Bayar' },
-            { id: 'C-a0122', idPelanggan: 'P-0005', tgl: '2026-02-01', lalu: 7, sekarang: 7, pemakaian: 0, tagihanMurni: 5000, sisaLalu: 0, totalHarusBayar: 5000, bayar: 0, sisa: 5000, status: 'Belum Bayar' },
-            { id: 'C-a0123', idPelanggan: 'P-0006', tgl: '2026-02-01', lalu: 36, sekarang: 37, pemakaian: 1, tagihanMurni: 6200, sisaLalu: 0, totalHarusBayar: 6200, bayar: 10000, sisa: -3800, status: 'Lebih Bayar' }
-        ];
-
-        // Data Kas Masuk Warga
-        let dataKasMasuk = JSON.parse(localStorage.getItem('pam_kas_masuk')) || [
-            { id: '2a759dda', idPelanggan: 'P-0001', nama: 'Siti Purwa', tgl: '2025-08-01', bulan: 'Agustus - Desember', nominal: 50000, catatan: 'Kas tahun 2025' },
-            { id: '38bba7a0', idPelanggan: 'P-0002', nama: 'Sugino', tgl: '2026-03-24', bulan: 'Januari - Agustus', nominal: 80000, catatan: 'Kas tahun 2026' }
-        ];
-
-        // Data Pendapatan Lain-lain & Sponsorship
-        let dataPendapatanLain = JSON.parse(localStorage.getItem('pam_pendapatan_lain')) || [
-            { no: 1, tgl: '2026-02-15', kategori: 'Sponsor Kegiatan', sumber: 'PT. Tirta Perkasa', ket: 'Sponsor spanduk & kerja bakti warga', nominal: 500000 },
-            { no: 2, tgl: '2026-03-10', kategori: 'Donasi / Hibah', sumber: 'H. Budi Santoso', ket: 'Sumbangan perbaikan pompa air', nominal: 250000 }
-        ];
-
-        // Data Pengeluaran Kas Warga
-        let dataPengeluaran = JSON.parse(localStorage.getItem('pam_pengeluaran')) || [
-            { no: 1, tgl: '2026-02-28', kategori: 'Sosial', ket: 'Sosial Jenguk Mb Ayu', nominal: 200000 },
-            { no: 2, tgl: '2026-02-28', kategori: 'Perlengkapan', ket: 'Pembelian Obat Semprot', nominal: 40000 },
-            { no: 3, tgl: '2026-03-05', kategori: 'Token Listrik PAM', ket: 'Pembelian token listrik', nominal: 105000 }
-        ];
+        let dataCatatMeter = JSON.parse(localStorage.getItem('pam_meter')) || [];
+        let dataKasMasuk = JSON.parse(localStorage.getItem('pam_kas_masuk')) || [];
+        let dataPendapatanLain = JSON.parse(localStorage.getItem('pam_pendapatan_lain')) || [];
+        let dataPengeluaran = JSON.parse(localStorage.getItem('pam_pengeluaran')) || [];
 
         window.onload = function() {
-            renderAllData();
+            // Coba ambil data otomatis dari Google Spreadsheet saat halaman dimuat
+            syncDataFromCloud();
         };
+
+        // Fungsi untuk mengambil data dari Google Apps Script Web App
+        async function syncDataFromCloud() {
+            if (SPREADSHEET_API_URL === 'URL_WEB_APP_ANDA_DISINI') {
+                renderAllData();
+                return;
+            }
+
+            showToast('Menghubungkan ke Google Spreadsheet...', 'bg-blue-600');
+            try {
+                // Mengambil sheet 'Pelanggan'
+                const response = await fetch(SPREADSHEET_API_URL + '?sheet=Pelanggan');
+                const result = await response.json();
+                if(result && Array.isArray(result) && result.length > 0) {
+                    dataPelanggan = result;
+                    localStorage.setItem('pam_pelanggan', JSON.stringify(dataPelanggan));
+                }
+                
+                showToast('Data berhasil disinkronkan dari Spreadsheet!', 'bg-emerald-600');
+            } catch (error) {
+                console.error('Gagal sinkronisasi cloud:', error);
+                showToast('Menggunakan data lokal (Offline mode).', 'bg-amber-600');
+            }
+            renderAllData();
+        }
 
         function switchLoginRole(role) {
             currentRole = role;
@@ -1267,7 +1268,7 @@
                 return;
             }
 
-            if(editId) return; // If editing existing record, don't overwrite
+            if(editId) return;
 
             const history = dataCatatMeter.filter(m => m.idPelanggan === pelId);
             if(history.length > 0) {
@@ -1405,7 +1406,6 @@
             }
         }
 
-        // --- EDIT & DELETE CATAT METER ---
         function editCatatMeter(id) {
             const m = dataCatatMeter.find(x => x.id === id);
             if(!m) return;
@@ -1431,7 +1431,6 @@
             }
         }
 
-        // --- EDIT & DELETE KAS MASUK WARGA ---
         function openModalKasMasuk() {
             document.getElementById('editKasId').value = '';
             document.getElementById('modalKasTitle').innerText = 'Setoran Kas Bulanan Warga';
@@ -1468,7 +1467,6 @@
             }
         }
 
-        // --- EDIT & DELETE PENDAPATAN LAIN ---
         function openModalPendapatanLain() {
             document.getElementById('editLainIdx').value = -1;
             document.getElementById('modalLainTitle').innerText = 'Catat Pendapatan Lain / Sponsor';
@@ -1504,7 +1502,6 @@
             }
         }
 
-        // --- EDIT & DELETE PENGELUARAN ---
         function openModalPengeluaran() {
             document.getElementById('editPengeluaranIdx').value = -1;
             document.getElementById('modalPengeluaranTitle').innerText = 'Catat Pengeluaran Kas';
@@ -1538,7 +1535,6 @@
             }
         }
 
-        // --- EDIT & DELETE MASTER PELANGGAN ---
         function openModalPelanggan() {
             document.getElementById('editPelangganId').value = '';
             document.getElementById('modalPelangganTitle').innerText = 'Tambah Warga / Pelanggan Baru';
@@ -1767,7 +1763,6 @@
             closeModal('modalPelanggan');
         }
 
-        // --- BACKUP & RESTORE FUNCTIONS ---
         function getBackupPayload() {
             return {
                 timestamp: new Date().toISOString(),
